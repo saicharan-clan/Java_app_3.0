@@ -49,20 +49,19 @@ pipeline {
         }
 
         stage('Static code analysis: Sonarqube') {
-            when { expression { params.action == 'create' } }
-            steps {
-                withEnv([
-                    'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64',
-                    'PATH+JAVA=/usr/lib/jvm/java-17-openjdk-amd64/bin'
-                ]) {
-                    withSonarQubeEnv('SonarQube') {
-                        sh 'java -version'
-                        sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar'
-                    }
-                }
+    when { expression { params.action == 'create' } }
+    steps {
+        withEnv([
+            'JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64',
+            'PATH+JAVA=/usr/lib/jvm/java-21-openjdk-amd64/bin'
+        ]) {
+            withSonarQubeEnv('SonarQube') {
+                sh 'java -version'
+                sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar'
             }
         }
-
+    }
+}
         stage('Quality Gate Status Check : Sonarqube') {
             when { expression { params.action == 'create' } }
             steps {
