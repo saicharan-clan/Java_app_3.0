@@ -31,7 +31,7 @@ pipeline {
                     'PATH+JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin'
                 ]) {
                     sh 'java -version'
-                    sh 'mvn test'
+                    sh 'mvn clean test'
                 }
             }
         }
