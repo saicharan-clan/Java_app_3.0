@@ -1,30 +1,53 @@
 pipeline {
 
     agent any
-    //agent { label 'Demo' }
+    // agent { label 'Demo' }
 
     parameters {
 
-        choice(name: 'action', choices: 'create\ndelete', description: 'Choose create/Destroy')
-        string(name: 'ImageName', description: "name of the docker build", defaultValue: 'javapp')
-        string(name: 'ImageTag', description: "tag of the docker build", defaultValue: 'v1')
-        string(name: 'DockerHubUser', description: "name of the Application", defaultValue: 'jhongreesham')
+        choice(
+            name: 'action',
+            choices: 'create\ndelete',
+            description: 'Choose create/Destroy'
+        )
+
+        string(
+            name: 'ImageName',
+            description: 'Name of the Docker image',
+            defaultValue: 'javapp'
+        )
+
+        string(
+            name: 'ImageTag',
+            description: 'Tag of the Docker image',
+            defaultValue: 'v1'
+        )
+
+        string(
+            name: 'DockerHubUser',
+            description: 'DockerHub username',
+            defaultValue: 'jhongreesham'
+        )
     }
 
     stages {
 
         stage('Git Checkout') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
                 git(
-                    branch: "main",
-                    url: "https://github.com/saicharan-clan/Java_app_3.0"
+                    branch: 'main',
+                    url: 'https://github.com/saicharan-clan/Java_app_3.0'
                 )
             }
         }
 
         stage('Unit Test maven') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
                 withEnv([
                     'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
@@ -37,7 +60,9 @@ pipeline {
         }
 
         stage('Integration Test maven') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
                 withEnv([
                     'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
@@ -49,21 +74,26 @@ pipeline {
         }
 
         stage('Static code analysis: Sonarqube') {
-    when { expression { params.action == 'create' } }
-    steps {
-        withEnv([
-            'JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64',
-            'PATH+JAVA=/usr/lib/jvm/java-21-openjdk-amd64/bin'
-        ]) {
-            withSonarQubeEnv('SonarQube') {
-                sh 'java -version'
-                sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar'
+            when {
+                expression { params.action == 'create' }
+            }
+            steps {
+                withEnv([
+                    'JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64',
+                    'PATH+JAVA=/usr/lib/jvm/java-21-openjdk-amd64/bin'
+                ]) {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'java -version'
+                        sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar'
+                    }
+                }
             }
         }
-    }
-}
+
         stage('Quality Gate Status Check : Sonarqube') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
@@ -72,7 +102,9 @@ pipeline {
         }
 
         stage('Maven Build : maven') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
                 withEnv([
                     'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
@@ -84,27 +116,55 @@ pipeline {
         }
 
         stage('Docker Image Build') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
-                sh "docker build -t ${params.DockerHubUser}/${params.ImageName}:${params.ImageTag} ."
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh """
+                        docker build -t \$DOCKER_USERNAME/${params.ImageName}:${params.ImageTag} .
+                    """
+                }
             }
         }
 
         stage('Docker Image Scan: trivy') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
-                sh "trivy image ${params.DockerHubUser}/${params.ImageName}:${params.ImageTag}"
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh """
+                        trivy image \$DOCKER_USERNAME/${params.ImageName}:${params.ImageTag}
+                    """
+                }
             }
         }
 
         stage('Docker Image Push : DockerHub') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-credentials',
-                    usernameVariable: 'DOCKER_USERNAME',
-                    passwordVariable: 'DOCKER_PASSWORD'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
                     sh """
                         echo "\$DOCKER_PASSWORD" | docker login -u "\$DOCKER_USERNAME" --password-stdin
                         docker push "\$DOCKER_USERNAME/${params.ImageName}:${params.ImageTag}"
@@ -114,9 +174,21 @@ pipeline {
         }
 
         stage('Docker Image Cleanup : DockerHub') {
-            when { expression { params.action == 'create' } }
+            when {
+                expression { params.action == 'create' }
+            }
             steps {
-                sh "docker rmi jhongreesham/javapp:v1"
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-credentials',
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )
+                ]) {
+                    sh """
+                        docker rmi \$DOCKER_USERNAME/${params.ImageName}:${params.ImageTag} || true
+                    """
+                }
             }
         }
     }
