@@ -22,15 +22,11 @@ pipeline{
             )
             }
         }
-         stage('Unit Test maven'){
          
-         when { expression {  params.action == 'create' } }
-
+        stage('Unit Test maven'){
+            when { expression { params.action == 'create' } }
             steps{
-               script{
-                   
-                   mvnTest()
-               }
+                sh 'mvn test'
             }
         }
          stage('Integration Test maven'){
