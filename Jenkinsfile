@@ -26,22 +26,38 @@ pipeline {
         stage('Unit Test maven') {
             when { expression { params.action == 'create' } }
             steps {
-                sh 'mvn test'
+                withEnv([
+                    'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
+                    'PATH+JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin'
+                ]) {
+                    sh 'java -version'
+                    sh 'mvn test'
+                }
             }
         }
 
         stage('Integration Test maven') {
             when { expression { params.action == 'create' } }
             steps {
-                sh 'mvn verify'
+                withEnv([
+                    'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
+                    'PATH+JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin'
+                ]) {
+                    sh 'mvn verify'
+                }
             }
         }
 
         stage('Static code analysis: Sonarqube') {
             when { expression { params.action == 'create' } }
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh 'mvn sonar:sonar'
+                withEnv([
+                    'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
+                    'PATH+JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin'
+                ]) {
+                    withSonarQubeEnv('SonarQube') {
+                        sh 'mvn sonar:sonar'
+                    }
                 }
             }
         }
@@ -58,7 +74,12 @@ pipeline {
         stage('Maven Build : maven') {
             when { expression { params.action == 'create' } }
             steps {
-                sh 'mvn package -DskipTests'
+                withEnv([
+                    'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
+                    'PATH+JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin'
+                ]) {
+                    sh 'mvn package -DskipTests'
+                }
             }
         }
 
@@ -84,10 +105,10 @@ pipeline {
                     usernameVariable: 'DOCKER_USERNAME',
                     passwordVariable: 'DOCKER_PASSWORD'
                 )]) {
-                    sh '''
-                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-                        docker push "$DOCKER_USERNAME/${ImageName}:${ImageTag}"
-                    '''
+                    sh """
+                        echo "\$DOCKER_PASSWORD" | docker login -u "\$DOCKER_USERNAME" --password-stdin
+                        docker push "\$DOCKER_USERNAME/${params.ImageName}:${params.ImageTag}"
+                    """
                 }
             }
         }
