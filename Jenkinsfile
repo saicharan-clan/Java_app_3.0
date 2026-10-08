@@ -56,7 +56,7 @@ pipeline {
                     'PATH+JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin'
                 ]) {
                     withSonarQubeEnv('SonarQube') {
-                        sh 'mvn sonar:sonar'
+                        sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar'
                     }
                 }
             }
