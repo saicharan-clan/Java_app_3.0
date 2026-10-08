@@ -1,9 +1,10 @@
-pipeline{
+```groovy
+pipeline {
 
     agent any
     //agent { label 'Demo' }
 
-    parameters{
+    parameters {
 
         choice(name: 'action', choices: 'create\ndelete', description: 'Choose create/Destroy')
         string(name: 'ImageName', description: "name of the docker build", defaultValue: 'javapp')
@@ -11,97 +12,93 @@ pipeline{
         string(name: 'DockerHubUser', description: "name of the Application", defaultValue: 'praveensingam1994')
     }
 
-    stages{
-         
-        stage('Git Checkout'){
-                    when { expression {  params.action == 'create' } }
-            steps{
-            git(
-                branch: "main",
-                url: "https://github.com/praveen1994dec/Java_app_3.0.git"
-            )
+    stages {
+
+        stage('Git Checkout') {
+            when { expression { params.action == 'create' } }
+            steps {
+                git(
+                    branch: "main",
+                    url: "https://github.com/praveen1994dec/Java_app_3.0.git"
+                )
             }
         }
-         
-        stage('Unit Test maven'){
+
+        stage('Unit Test maven') {
             when { expression { params.action == 'create' } }
-            steps{
+            steps {
                 sh 'mvn test'
             }
         }
-         stage('Integration Test maven'){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   mvnIntegrationTest()
-               }
+
+        stage('Integration Test maven') {
+            when { expression { params.action == 'create' } }
+            steps {
+                sh 'mvn verify'
             }
         }
-        stage('Static code analysis: Sonarqube'){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   def SonarQubecredentialsId = 'sonarqube-api'
-                   statiCodeAnalysis(SonarQubecredentialsId)
-               }
-            }
-       }
-       stage('Quality Gate Status Check : Sonarqube'){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   def SonarQubecredentialsId = 'sonarqube-api'
-                   QualityGateStatus(SonarQubecredentialsId)
-               }
-            }
-       }
-        stage('Maven Build : maven'){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   mvnBuild()
-               }
+
+        stage('Static code analysis: Sonarqube') {
+            when { expression { params.action == 'create' } }
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar'
+                }
             }
         }
-        stage('Docker Image Build'){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   dockerBuild("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
-               }
+
+        stage('Quality Gate Status Check : Sonarqube') {
+            when { expression { params.action == 'create' } }
+            steps {
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
             }
         }
-         stage('Docker Image Scan: trivy '){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   dockerImageScan("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
-               }
+
+        stage('Maven Build : maven') {
+            when { expression { params.action == 'create' } }
+            steps {
+                sh 'mvn package -DskipTests'
             }
         }
-        stage('Docker Image Push : DockerHub '){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   dockerImagePush("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
-               }
+
+        stage('Docker Image Build') {
+            when { expression { params.action == 'create' } }
+            steps {
+                sh "docker build -t ${params.DockerHubUser}/${params.ImageName}:${params.ImageTag} ."
             }
-        }   
-        stage('Docker Image Cleanup : DockerHub '){
-         when { expression {  params.action == 'create' } }
-            steps{
-               script{
-                   
-                   dockerImageCleanup("${params.ImageName}","${params.ImageTag}","${params.DockerHubUser}")
-               }
+        }
+
+        stage('Docker Image Scan: trivy ') {
+            when { expression { params.action == 'create' } }
+            steps {
+                sh "trivy image ${params.DockerHubUser}/${params.ImageName}:${params.ImageTag}"
             }
-        }      
+        }
+
+        stage('Docker Image Push : DockerHub ') {
+            when { expression { params.action == 'create' } }
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-credentials',
+                    usernameVariable: 'DOCKER_USERNAME',
+                    passwordVariable: 'DOCKER_PASSWORD'
+                )]) {
+                    sh '''
+                        echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+                        docker push ${DockerHubUser}/${ImageName}:${ImageTag}
+                    '''
+                }
+            }
+        }
+
+        stage('Docker Image Cleanup : DockerHub ') {
+            when { expression { params.action == 'create' } }
+            steps {
+                sh "docker rmi ${params.DockerHubUser}/${params.ImageName}:${params.ImageTag} || true"
+            }
+        }
     }
 }
+```
