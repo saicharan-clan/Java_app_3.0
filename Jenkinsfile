@@ -52,11 +52,12 @@ pipeline {
             when { expression { params.action == 'create' } }
             steps {
                 withEnv([
-                    'JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64',
-                    'PATH+JAVA=/usr/lib/jvm/java-8-openjdk-amd64/bin'
+                    'JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64',
+                    'PATH+JAVA=/usr/lib/jvm/java-17-openjdk-amd64/bin'
                 ]) {
                     withSonarQubeEnv('SonarQube') {
-                        sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:sonar'
+                        sh 'java -version'
+                        sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.11.0.3922:sonar'
                     }
                 }
             }
