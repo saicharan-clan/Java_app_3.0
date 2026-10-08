@@ -69,14 +69,14 @@ pipeline {
             }
         }
 
-        stage('Docker Image Scan: trivy ') {
+        stage('Docker Image Scan: trivy') {
             when { expression { params.action == 'create' } }
             steps {
                 sh "trivy image ${params.DockerHubUser}/${params.ImageName}:${params.ImageTag}"
             }
         }
 
-        stage('Docker Image Push : DockerHub ') {
+        stage('Docker Image Push : DockerHub') {
             when { expression { params.action == 'create' } }
             steps {
                 withCredentials([usernamePassword(
@@ -86,13 +86,13 @@ pipeline {
                 )]) {
                     sh '''
                         echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-                        docker push ${DockerHubUser}/${ImageName}:${ImageTag}
+                        docker push "$DOCKER_USERNAME/${ImageName}:${ImageTag}"
                     '''
                 }
             }
         }
 
-        stage('Docker Image Cleanup : DockerHub ') {
+        stage('Docker Image Cleanup : DockerHub') {
             when { expression { params.action == 'create' } }
             steps {
                 sh "docker rmi ${params.DockerHubUser}/${params.ImageName}:${params.ImageTag} || true"
@@ -100,4 +100,3 @@ pipeline {
         }
     }
 }
-```
